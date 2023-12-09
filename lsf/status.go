@@ -60,7 +60,7 @@ func GetHosts() ([]string, error) {
 	return hosts, nil
 }
 
-func (info *LsfInfo) GenBhostsConfig() error {
+func (info *LsfInfo) GenBhostsConfig(filepath string) error {
 	hosts := []*LsbHostConfig{}
 
 	hosts = append(hosts, &LsbHostConfig{
@@ -80,7 +80,12 @@ func (info *LsfInfo) GenBhostsConfig() error {
 		return err
 	}
 
-	err = tmpl.Execute(os.Stdout, hosts)
+	f, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+
+	err = tmpl.Execute(f, hosts)
 	if err != nil {
 		return err
 	}
@@ -88,7 +93,7 @@ func (info *LsfInfo) GenBhostsConfig() error {
 	return nil
 }
 
-func (info *LsfInfo) GenLsfClusterConfig() error {
+func (info *LsfInfo) GenLsfClusterConfig(filepath string) error {
 	hosts := []*LsfClusterOpenlavaConfig{}
 
 	hosts = append(hosts, &LsfClusterOpenlavaConfig{
@@ -113,7 +118,12 @@ func (info *LsfInfo) GenLsfClusterConfig() error {
 		return err
 	}
 
-	err = tmpl.Execute(os.Stdout, hosts)
+	f, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+
+	err = tmpl.Execute(f, hosts)
 	if err != nil {
 		return err
 	}

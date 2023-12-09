@@ -25,12 +25,12 @@ func AddNode(ctx *cli.Context) error {
 		return err
 	}
 
-	err = lsfInfo.GenLsfClusterConfig()
+	err = lsfInfo.GenLsfClusterConfig("/tmp/lsf.cluster.openlava")
 	if err != nil {
 		return err
 	}
 
-	err = lsfInfo.GenBhostsConfig()
+	err = lsfInfo.GenBhostsConfig("/tmp/lsb.hosts")
 	if err != nil {
 		return err
 	}
