@@ -1,0 +1,22 @@
+Begin   ClusterAdmins
+Administrators = lsfadmin
+End    ClusterAdmins
+
+Begin   Host
+HOSTNAME          model          type  server  r1m  RESOURCES
+# yourhost                  IntelI5      linux   1      3.5    (cs)
+manager         IntelI5 linux   1       3.5     (cs)
+compute000         IntelI5 linux   0       3.5     (cs)
+conn-001                IntelI5 linux   1       3.5     (cs)
+conn-161                IntelI5 linux   1       3.5     (cs)
+conn-186                IntelI5 linux   1       3.5     (cs)
+conn-syn-006            IntelI5 linux   1       3.5     (cs)
+conn-211                IntelI5 linux   1       3.5     (cs)
+End     Host
+
+Begin ResourceMap
+RESOURCENAME  LOCATION
+# tmp2          [default]
+# nio           [all]
+# console       [default]
+End ResourceMap
