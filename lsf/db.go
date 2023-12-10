@@ -26,6 +26,14 @@ func (info *LsfInfo) GetHosts() ([]string, error) {
 	return hostnames, nil
 }
 
+func (info *LsfInfo) DelHost(hostname string) error {
+	if err := info.Db.Where("host_name = ?", hostname).Delete(&LsfHost{}).Error; err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (info *LsfInfo) UpdateHosts(hosts []string) error {
 	var lsfhosts []LsfHost
 

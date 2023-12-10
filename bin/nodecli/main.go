@@ -41,6 +41,43 @@ func NodeAddCommand(action func(ctx *cli.Context) error) *cli.Command {
 	}
 }
 
+func NodeDelCommand(action func(ctx *cli.Context) error) *cli.Command {
+	return &cli.Command{
+		Name:   "del",
+		Usage:  "del node from openlava, and regenerate config",
+		Action: action,
+		Flags: []cli.Flag{
+			ConfigDirFlag,
+			HostNameFlag,
+		},
+	}
+}
+
+func DelNode(ctx *cli.Context) error {
+	lsfInfo, err := lsf.MakeLsfInfo()
+
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.DelHostname(hostname)
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenLsfClusterConfig(fmt.Sprintf("%s/lsf.cluster.openlava", configDir))
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenBhostsConfig(fmt.Sprintf("%s/lsb.hosts", configDir))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func AddNode(ctx *cli.Context) error {
 	lsfInfo, err := lsf.MakeLsfInfo()
 
@@ -72,6 +109,7 @@ func main() {
 	app.Usage = "openlava node utils"
 	app.Commands = []*cli.Command{
 		NodeAddCommand(AddNode),
+		NodeDelCommand(DelNode),
 	}
 
 	if err := app.Run(os.Args); err != nil {

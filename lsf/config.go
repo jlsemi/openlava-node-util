@@ -8,7 +8,7 @@ End    ClusterAdmins
 
 Begin   Host
 HOSTNAME          model          type  server  r1m  RESOURCES
-{{ range . }}{{ .HostName }}  Intel5  linux {{ .HostType }} 3.5 (cs)
+{{ range . }}{{ .HostName }}  IntelI5  linux {{ .HostType }} 3.5 (cs)
 {{ end }}
 End Host 
 
