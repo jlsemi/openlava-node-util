@@ -176,7 +176,13 @@ func MakeLsfInfo() (*LsfInfo, error) {
 		ClientNode: DEFAULT_CLIENT_NODE_NAME,
 	}
 
-	db, err := gorm.Open(sqlite.Open(DEFAULT_SQLITE_DB_PATH), &gorm.Config{})
+	dbPath := DEFAULT_SQLITE_DB_PATH
+
+	if os.Getenv("SQLITE_DB_PATH") != "" {
+		dbPath = os.Getenv("SQLITE_DB_PATH")
+	}
+
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}
