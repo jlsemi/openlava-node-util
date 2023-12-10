@@ -27,19 +27,19 @@ func (info *LsfInfo) GetHosts() ([]string, error) {
 }
 
 func (info *LsfInfo) UpdateHosts(hosts []string) error {
-	return info.Db.Transaction(func(tx *gorm.DB) error {
-		for _, hostname := range hosts {
-			if result := tx.Where(LsfHost{HostName: hostname}); result.RowsAffected == 0 {
-				if err := tx.Create(&LsfHost{
-					HostName: hostname,
-				}).Error; err != nil {
-					lsfLog.Errorf("UpdateHosts failed, failed to add %v, error: %v", hostname, err)
-					return err
-				}
+	var lsfhosts []LsfHost
+
+	for _, hostname := range hosts {
+		if result := info.Db.Where(&LsfHost{HostName: hostname}).Find(&lsfhosts); result.RowsAffected == 0 {
+			lsfLog.Debugf("Check hostname %v exist: %v", hostname, result)
+			if err := info.Db.Create(&LsfHost{
+				HostName: hostname,
+			}).Error; err != nil {
+				lsfLog.Errorf("UpdateHosts failed, failed to add %v, error: %v", hostname, err)
+				return err
 			}
 		}
+	}
 
-		// do commit
-		return nil
-	})
+	return nil
 }
