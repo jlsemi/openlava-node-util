@@ -170,6 +170,23 @@ func (info *LsfInfo) Init() error {
 	return nil
 }
 
+func (info *LsfInfo) AddHostname(hostname string) error {
+
+	// add host
+	err := info.UpdateHosts([]string{hostname})
+	if err != nil {
+		return err
+	}
+
+	hosts, err := info.GetHosts()
+	if err != nil {
+		return err
+	}
+
+	info.UpdateWorkerNodes(hosts)
+	return nil
+}
+
 func MakeLsfInfo() (*LsfInfo, error) {
 	info := &LsfInfo{
 		MasterNode: DEFAULT_MASTER_NODE_NAME,

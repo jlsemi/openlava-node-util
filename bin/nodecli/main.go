@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/urfave/cli/v2"
 	"jlsemi.com/openlava-utils/logs"
 	"jlsemi.com/openlava-utils/lsf"
@@ -9,12 +10,34 @@ import (
 
 var utilLog = logs.GetLogger()
 
+var (
+	configDir string
+	hostname  string
+
+	ConfigDirFlag = &cli.StringFlag{
+		Name:        "config_dir",
+		Usage:       "path to openlava config dir",
+		Destination: &configDir,
+		Required:    true,
+	}
+
+	HostNameFlag = &cli.StringFlag{
+		Name:        "hostname",
+		Usage:       "set hostname to operate",
+		Destination: &hostname,
+		Required:    true,
+	}
+)
+
 func NodeAddCommand(action func(ctx *cli.Context) error) *cli.Command {
 	return &cli.Command{
 		Name:   "add",
 		Usage:  "add node to openlava, and generate new config",
 		Action: action,
-		Flags:  []cli.Flag{},
+		Flags: []cli.Flag{
+			ConfigDirFlag,
+			HostNameFlag,
+		},
 	}
 }
 
@@ -25,12 +48,17 @@ func AddNode(ctx *cli.Context) error {
 		return err
 	}
 
-	err = lsfInfo.GenLsfClusterConfig("/tmp/lsf.cluster.openlava")
+	err = lsfInfo.AddHostname(hostname)
 	if err != nil {
 		return err
 	}
 
-	err = lsfInfo.GenBhostsConfig("/tmp/lsb.hosts")
+	err = lsfInfo.GenLsfClusterConfig(fmt.Sprintf("%s/lsf.cluster.openlava", configDir))
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenBhostsConfig(fmt.Sprintf("%s/lsb.hosts", configDir))
 	if err != nil {
 		return err
 	}
