@@ -53,6 +53,28 @@ func NodeDelCommand(action func(ctx *cli.Context) error) *cli.Command {
 	}
 }
 
+func ShowQueueInfoCommand(action func(ctx *cli.Context) error) *cli.Command {
+	return &cli.Command{
+		Name:   "queues",
+		Usage:  "show all queue info",
+		Action: action,
+		Flags:  []cli.Flag{},
+	}
+}
+
+func ShowQueueInfo(ctx *cli.Context) error {
+	queueList, err := lsf.GetQueuesInfo()
+	if err != nil {
+		return err
+	}
+
+	for _, info := range queueList {
+		utilLog.Infof("QueueInfo: %v users: %v, hosts: %v", info.QueueName, info.Users, info.Hosts)
+	}
+
+	return nil
+}
+
 func DelNode(ctx *cli.Context) error {
 	lsfInfo, err := lsf.MakeLsfInfo()
 
@@ -110,6 +132,7 @@ func main() {
 	app.Commands = []*cli.Command{
 		NodeAddCommand(AddNode),
 		NodeDelCommand(DelNode),
+		ShowQueueInfoCommand(ShowQueueInfo),
 	}
 
 	if err := app.Run(os.Args); err != nil {

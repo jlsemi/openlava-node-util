@@ -6,6 +6,7 @@ import (
 	"jlsemi.com/openlava-utils/logs"
 	"jlsemi.com/openlava-utils/util"
 	"os"
+	"regexp"
 	"strings"
 	"text/template"
 
@@ -17,6 +18,7 @@ const (
 	DEFAULT_MASTER_NODE_NAME = "manager"
 	DEFAULT_CLIENT_NODE_NAME = "compute000"
 	DEFAULT_SQLITE_DB_PATH   = "/tmp/openlava.db"
+	DEFAULT_ALL_USER         = "all user"
 )
 
 var lsfLog = logs.GetLogger()
@@ -28,6 +30,12 @@ type LsfInfo struct {
 	Db          *gorm.DB
 }
 
+type LsfQueueInfo struct {
+	QueueName string
+	Users     string
+	Hosts     []string
+}
+
 type LsfClusterOpenlavaConfig struct {
 	HostName string
 	HostType string
@@ -36,6 +44,75 @@ type LsfClusterOpenlavaConfig struct {
 type LsbHostConfig struct {
 	HostName string
 	MaxNodes string
+}
+
+func GetQueueDetailInfo(queueName string) (*LsfQueueInfo, error) {
+	// 获得当前queue的基本信息
+	var (
+		userGroup string
+		hosts     []string
+	)
+
+	cmd := fmt.Sprintf("bqueues -l %s", queueName)
+	rsp, err := util.ExecCommand("bash", []string{"-c", cmd})
+
+	if err != nil {
+		lsfLog.Errorf("execute failed, cmd: %s,  error: %v", cmd, err)
+		return nil, err
+	}
+
+	// patterns
+	hostContentPattern := regexp.MustCompile(`HOSTS:\s*(.*)`)
+	userPattern := regexp.MustCompile(`USERS:\s*([^/\n]*)`)
+	hostSplitPattern := regexp.MustCompile(`[^\s]*`)
+
+	result := userPattern.FindAllStringSubmatch(rsp, -1)
+	if len(result) == 0 {
+		return nil, fmt.Errorf("GetQueueDetailInfo failed, usergroup not found")
+	}
+
+	userGroup = result[0][1]
+
+	result = hostContentPattern.FindAllStringSubmatch(rsp, -1)
+	if len(result) == 0 {
+		return nil, fmt.Errorf("GetQueueInfo failed, hostCotent not found")
+	}
+
+	hosts = hostSplitPattern.FindAllString(result[0][1], -1)
+
+	return &LsfQueueInfo{
+		QueueName: queueName,
+		Users:     userGroup,
+		Hosts:     hosts,
+	}, nil
+}
+
+func GetQueuesInfo() ([]*LsfQueueInfo, error) {
+	queues := []*LsfQueueInfo{}
+
+	cmd := fmt.Sprintf("bqueues -w | grep -v QUEUE_NAME | awk '{print $1}'")
+	rsp, err := util.ExecCommand("bash", []string{"-c", cmd})
+
+	if err != nil {
+		lsfLog.Errorf("execute failed, cmd: %s, error: %v", cmd, err)
+		return nil, err
+	}
+
+	reader := strings.NewReader(rsp)
+	scanner := bufio.NewScanner(reader)
+
+	for scanner.Scan() {
+		queuename := scanner.Text()
+		result, err := GetQueueDetailInfo(queuename)
+
+		if err != nil {
+			return nil, err
+		}
+
+		queues = append(queues, result)
+	}
+
+	return queues, nil
 }
 
 func GetHosts() ([]string, error) {
