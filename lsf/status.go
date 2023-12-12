@@ -252,6 +252,8 @@ func (info *LsfInfo) InitQueue() error {
 		return nil
 	}
 
+	lsfLog.Infof("initQueue: Update queueInfo from bqueues")
+
 	queueInfoFromBqueues, err := GetQueuesInfo()
 	if err != nil {
 		return err
@@ -296,6 +298,7 @@ func (info *LsfInfo) Init() error {
 		return err
 	}
 
+	lsfLog.Infof("Init: update hosts from bhost")
 	return nil
 }
 
@@ -312,10 +315,16 @@ func (info *LsfInfo) DelHostname(hostname string) error {
 	}
 
 	info.UpdateWorkerNodes(hosts)
+	lsfLog.Infof("DelHost %s", hostname)
 	return nil
 }
 
 func (info *LsfInfo) AddHostname(hostname string) error {
+
+	if hostname == info.ClientNode {
+		lsfLog.Infof("client node %v cannot add to hosts", hostname)
+		return nil
+	}
 
 	// add host
 	err := info.UpdateHosts([]string{hostname})
@@ -329,6 +338,7 @@ func (info *LsfInfo) AddHostname(hostname string) error {
 	}
 
 	info.UpdateWorkerNodes(hosts)
+	lsfLog.Infof("AddHost %s", hostname)
 	return nil
 }
 

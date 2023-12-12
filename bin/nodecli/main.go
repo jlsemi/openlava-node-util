@@ -51,6 +51,7 @@ func NodeAddCommand(action func(ctx *cli.Context) error) *cli.Command {
 }
 
 func NodeDelCommand(action func(ctx *cli.Context) error) *cli.Command {
+
 	return &cli.Command{
 		Name:   "del",
 		Usage:  "del node from openlava, and regenerate config",

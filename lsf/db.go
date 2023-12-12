@@ -64,6 +64,11 @@ func (info *LsfInfo) AddHostToQueue(hostname string, queuename string) error {
 		lsfQueueHost []LsfQueueHost
 	)
 
+	if hostname == info.ClientNode {
+		lsfLog.Infof("clientNode %s cannot add to queue", hostname)
+		return nil
+	}
+
 	if result := info.Db.Where(&LsfQueue{QueueName: queuename}).Find(&lsfQueue); result.RowsAffected == 0 {
 		return fmt.Errorf("queuename %v not exist", queuename)
 	}
@@ -83,6 +88,7 @@ func (info *LsfInfo) AddHostToQueue(hostname string, queuename string) error {
 		}
 	}
 
+	lsfLog.Infof("Add %s to queue %s", hostname, queuename)
 	return info.InitQueue()
 }
 
@@ -91,6 +97,7 @@ func (info *LsfInfo) DelHostFromAllQueues(hostname string) error {
 		return err
 	}
 
+	lsfLog.Infof("Delete %s from queues", hostname)
 	return info.InitQueue()
 }
 
