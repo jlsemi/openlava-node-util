@@ -27,6 +27,7 @@ type LsfInfo struct {
 	MasterNode  string
 	ClientNode  string // 跳板机
 	WorkerNodes []string
+	QueueInfo   []*LsfQueueInfo // Queue相关信息
 	Db          *gorm.DB
 }
 
@@ -170,6 +171,25 @@ func (info *LsfInfo) GenBhostsConfig(filepath string) error {
 	return nil
 }
 
+func (info *LsfInfo) GenLsfQueueConfig(filepath string) error {
+	tmpl, err := template.New("lsb.queues").Parse(bqueueConfig)
+	if err != nil {
+		return err
+	}
+
+	f, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+
+	err = tmpl.Execute(f, info.QueueInfo)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (info *LsfInfo) GenLsfClusterConfig(filepath string) error {
 	hosts := []*LsfClusterOpenlavaConfig{}
 
@@ -220,6 +240,32 @@ func (info *LsfInfo) UpdateWorkerNodes(hosts []string) {
 	info.WorkerNodes = nodes
 }
 
+func (info *LsfInfo) InitQueue() error {
+	queueInfo, err := info.GetQueueInfo()
+	if err != nil {
+		return err
+	}
+
+	if len(queueInfo) > 0 {
+		lsfLog.Infof("InitQueue: Update queueInfo from db")
+		info.QueueInfo = queueInfo
+		return nil
+	}
+
+	queueInfoFromBqueues, err := GetQueuesInfo()
+	if err != nil {
+		return err
+	}
+
+	err = info.UpdateQueueInfo(queueInfoFromBqueues)
+	if err != nil {
+		return err
+	}
+
+	info.QueueInfo = queueInfoFromBqueues
+	return nil
+}
+
 func (info *LsfInfo) Init() error {
 	hostsFromDb, err := info.GetHosts()
 
@@ -244,6 +290,12 @@ func (info *LsfInfo) Init() error {
 	}
 
 	info.UpdateWorkerNodes(hostsFromBhosts)
+
+	err = info.InitQueue()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -300,7 +352,16 @@ func MakeLsfInfo() (*LsfInfo, error) {
 	info.Db = db
 
 	err = db.AutoMigrate(&LsfHost{})
+	if err != nil {
+		return nil, err
+	}
 
+	err = db.AutoMigrate(&LsfQueue{})
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.AutoMigrate(&LsfQueueHost{})
 	if err != nil {
 		return nil, err
 	}

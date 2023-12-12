@@ -1,5 +1,17 @@
 package lsf
 
+const bqueueConfig = `
+{{ range . }}
+Begin Queue
+QUEUE_NAME   = {{ .QueueName }}
+PRIORITY     = 30
+NICE         = 20
+USERS        = {{ .Users }}
+HOSTS = {{ range .Hosts }} {{ . }} {{ end }}
+End Queue
+{{ end }}
+`
+
 const clusterConfig = `
 Begin   ClusterAdmins
 Administrators = lsfadmin

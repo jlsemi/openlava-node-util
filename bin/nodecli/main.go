@@ -13,6 +13,7 @@ var utilLog = logs.GetLogger()
 var (
 	configDir string
 	hostname  string
+	queuename string
 
 	ConfigDirFlag = &cli.StringFlag{
 		Name:        "config_dir",
@@ -27,6 +28,13 @@ var (
 		Destination: &hostname,
 		Required:    true,
 	}
+
+	QueueNameFlag = &cli.StringFlag{
+		Name:        "queuename",
+		Usage:       "set queuename to operate",
+		Destination: &queuename,
+		Required:    true,
+	}
 )
 
 func NodeAddCommand(action func(ctx *cli.Context) error) *cli.Command {
@@ -37,6 +45,7 @@ func NodeAddCommand(action func(ctx *cli.Context) error) *cli.Command {
 		Flags: []cli.Flag{
 			ConfigDirFlag,
 			HostNameFlag,
+			QueueNameFlag,
 		},
 	}
 }
@@ -63,12 +72,13 @@ func ShowQueueInfoCommand(action func(ctx *cli.Context) error) *cli.Command {
 }
 
 func ShowQueueInfo(ctx *cli.Context) error {
-	queueList, err := lsf.GetQueuesInfo()
+	lsfInfo, err := lsf.MakeLsfInfo()
+
 	if err != nil {
 		return err
 	}
 
-	for _, info := range queueList {
+	for _, info := range lsfInfo.QueueInfo {
 		utilLog.Infof("QueueInfo: %v users: %v, hosts: %v", info.QueueName, info.Users, info.Hosts)
 	}
 
@@ -87,12 +97,22 @@ func DelNode(ctx *cli.Context) error {
 		return err
 	}
 
+	err = lsfInfo.DelHostFromAllQueues(hostname)
+	if err != nil {
+		return err
+	}
+
 	err = lsfInfo.GenLsfClusterConfig(fmt.Sprintf("%s/lsf.cluster.openlava", configDir))
 	if err != nil {
 		return err
 	}
 
 	err = lsfInfo.GenBhostsConfig(fmt.Sprintf("%s/lsb.hosts", configDir))
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenLsfQueueConfig(fmt.Sprintf("%s/lsb.queues", configDir))
 	if err != nil {
 		return err
 	}
@@ -112,12 +132,22 @@ func AddNode(ctx *cli.Context) error {
 		return err
 	}
 
+	err = lsfInfo.AddHostToQueue(hostname, queuename)
+	if err != nil {
+		return err
+	}
+
 	err = lsfInfo.GenLsfClusterConfig(fmt.Sprintf("%s/lsf.cluster.openlava", configDir))
 	if err != nil {
 		return err
 	}
 
 	err = lsfInfo.GenBhostsConfig(fmt.Sprintf("%s/lsb.hosts", configDir))
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenLsfQueueConfig(fmt.Sprintf("%s/lsb.queues", configDir))
 	if err != nil {
 		return err
 	}
