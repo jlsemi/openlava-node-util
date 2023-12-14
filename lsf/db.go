@@ -1,7 +1,6 @@
 package lsf
 
 import (
-	"fmt"
 	"gorm.io/gorm"
 )
 
@@ -58,19 +57,14 @@ func (info *LsfInfo) GetQueueInfo() ([]*LsfQueueInfo, error) {
 	return queueInfo, nil
 }
 
-func (info *LsfInfo) AddHostToQueue(hostname string, queuename string) error {
+func (info *LsfInfo) AddDbHostQueue(hostname string, queuename string) error {
 	var (
-		lsfQueue     []LsfQueue
 		lsfQueueHost []LsfQueueHost
 	)
 
 	if hostname == info.ClientNode {
 		lsfLog.Infof("clientNode %s cannot add to queue", hostname)
 		return nil
-	}
-
-	if result := info.Db.Where(&LsfQueue{QueueName: queuename}).Find(&lsfQueue); result.RowsAffected == 0 {
-		return fmt.Errorf("queuename %v not exist", queuename)
 	}
 
 	if result := info.Db.Where(&LsfQueueHost{QueueName: queuename, HostName: hostname}).Find(&lsfQueueHost); result.RowsAffected == 0 {
@@ -89,16 +83,46 @@ func (info *LsfInfo) AddHostToQueue(hostname string, queuename string) error {
 	}
 
 	lsfLog.Infof("Add %s to queue %s", hostname, queuename)
-	return info.InitQueue()
+	return nil
 }
 
-func (info *LsfInfo) DelHostFromAllQueues(hostname string) error {
-	if err := info.Db.Where("host_name = ?", hostname).Delete(&LsfQueueHost{}).Error; err != nil {
+func (info *LsfInfo) DelHostFromQueue(hostname string, queuename string) error {
+	if err := info.Db.Where("host_name = ? AND queue_name = ?", hostname, queuename).Delete(&LsfQueueHost{}).Error; err != nil {
 		return err
 	}
 
-	lsfLog.Infof("Delete %s from queues", hostname)
-	return info.InitQueue()
+	lsfLog.Infof("Delete %s from queue %s", hostname, queuename)
+	return nil
+}
+
+func (info *LsfInfo) AddQueue(queuename string, queueuser string) error {
+	var (
+		lsfQueue []LsfQueue
+	)
+
+	if result := info.Db.Where(&LsfQueue{QueueName: queuename}).Find(&lsfQueue); result.RowsAffected == 0 {
+		if err := info.Db.Create(&LsfQueue{
+			QueueName: queuename,
+			QueueUser: queueuser,
+		}).Error; err != nil {
+			lsfLog.Errorf("Create Queue info failed. Queue name: % , error: %v", queuename, err)
+			return err
+		}
+	} else {
+		lsfLog.Infof("Queue %s already exist", queuename)
+	}
+
+	lsfLog.Info("AddQueue to db: %s", queuename)
+	return nil
+}
+
+func (info *LsfInfo) DelQueue(queuename string) error {
+	if err := info.Db.Where("queue_name = ?", queuename).Delete(&LsfQueue{}).Error; err != nil {
+		return err
+	}
+
+	lsfLog.Infof("Delete queue %s", queuename)
+	return nil
 }
 
 func (info *LsfInfo) UpdateQueueInfo(queues []*LsfQueueInfo) error {

@@ -172,14 +172,23 @@ func (info *LsfInfo) GenBhostsConfig(filepath string) error {
 }
 
 func (info *LsfInfo) GenLsfQueueConfig(filepath string) error {
+	var (
+		f   *os.File
+		err error
+	)
+
 	tmpl, err := template.New("lsb.queues").Parse(bqueueConfig)
 	if err != nil {
 		return err
 	}
 
-	f, err := os.Create(filepath)
-	if err != nil {
-		return err
+	if filepath == "" {
+		f = os.Stdout
+	} else {
+		f, err = os.Create(filepath)
+		if err != nil {
+			return err
+		}
 	}
 
 	err = tmpl.Execute(f, info.QueueInfo)
@@ -240,31 +249,150 @@ func (info *LsfInfo) UpdateWorkerNodes(hosts []string) {
 	info.WorkerNodes = nodes
 }
 
+func (info *LsfInfo) AddHostToQueue(hostname string, queuename string) error {
+	var (
+		lsfQueue     []LsfQueue
+		lsfQueueHost []LsfQueueHost
+	)
+
+	if hostname == info.ClientNode {
+		lsfLog.Infof("clientNode %s cannot add to queue", hostname)
+		return nil
+	}
+
+	// update queue info from lsf
+
+	if result := info.Db.Where(&LsfQueue{QueueName: queuename}).Find(&lsfQueue); result.RowsAffected == 0 {
+		return fmt.Errorf("queuename %v not exist", queuename)
+	}
+
+	if result := info.Db.Where(&LsfQueueHost{QueueName: queuename, HostName: hostname}).Find(&lsfQueueHost); result.RowsAffected == 0 {
+		if err := info.Db.Create(&LsfQueueHost{
+			QueueName: queuename,
+			HostName:  hostname,
+		}).Error; err != nil {
+			lsfLog.Errorf(
+				"Create QueueHost info failed, Queue name: %v, host name: %v,  error: %v",
+				queuename,
+				hostname,
+				err,
+			)
+			return err
+		}
+	}
+
+	lsfLog.Infof("Add %s to queue %s", hostname, queuename)
+	return info.InitQueue()
+}
+
+func (info *LsfInfo) DelHostFromAllQueues(hostname string) error {
+	if err := info.Db.Where("host_name = ?", hostname).Delete(&LsfQueueHost{}).Error; err != nil {
+		return err
+	}
+
+	lsfLog.Infof("Delete %s from queues", hostname)
+	return info.InitQueue()
+}
+
+func (info *LsfInfo) SyncQueue() error {
+
+	var (
+		queueNamesFromDbDict  = make(map[string]*LsfQueueInfo)
+		queueNamesfromLsfDict = make(map[string]*LsfQueueInfo)
+	)
+
+	// get queues from db
+	queueInfoFromDb, err := info.GetQueueInfo()
+	if err != nil {
+		return err
+	}
+
+	for _, result := range queueInfoFromDb {
+		queueNamesFromDbDict[result.QueueName] = result
+	}
+
+	// get queues from bqueues
+	queueInfoFromBqueues, err := GetQueuesInfo()
+	if err != nil {
+		return err
+	}
+
+	for _, result := range queueInfoFromBqueues {
+		queueNamesfromLsfDict[result.QueueName] = result
+	}
+
+	// sync db info based on bqueues result
+	for _, queueResult := range queueInfoFromBqueues {
+		if _, ok := queueNamesFromDbDict[queueResult.QueueName]; !ok {
+			err = info.AddQueue(queueResult.QueueName, queueResult.Users)
+			if err != nil {
+				return err
+			}
+		}
+
+		for _, hostname := range queueResult.Hosts {
+			err = info.AddDbHostQueue(hostname, queueResult.QueueName)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, queueResult := range queueInfoFromDb {
+		hostsDict := map[string]string{}
+
+		if _, ok := queueNamesfromLsfDict[queueResult.QueueName]; !ok {
+			err = info.DelQueue(queueResult.QueueName)
+			if err != nil {
+				return err
+			}
+
+			lsfLog.Infof("del queue %s from db", queueResult.QueueName)
+		}
+
+		queueInfo, ok := queueNamesfromLsfDict[queueResult.QueueName]
+
+		if ok {
+			for _, hostname := range queueInfo.Hosts {
+				hostsDict[hostname] = hostname
+			}
+		}
+
+		for _, hostnameFromDb := range queueResult.Hosts {
+			if _, ok := hostsDict[hostnameFromDb]; !ok {
+				err := info.DelHostFromQueue(hostnameFromDb, queueResult.QueueName)
+				if err != nil {
+					return err
+				}
+
+				lsfLog.Infof("del host %s(%s) from db", hostnameFromDb, queueResult.QueueName)
+			}
+		}
+	}
+
+	queueInfo, err := info.GetQueueInfo()
+	if err != nil {
+		return err
+	}
+
+	info.QueueInfo = queueInfo
+	return nil
+}
+
 func (info *LsfInfo) InitQueue() error {
 	queueInfo, err := info.GetQueueInfo()
 	if err != nil {
 		return err
 	}
 
-	if len(queueInfo) > 0 {
-		lsfLog.Infof("InitQueue: Update queueInfo from db")
-		info.QueueInfo = queueInfo
-		return nil
+	lsfLog.Debugf("InitQueue .... %v", queueInfo)
+
+	if len(queueInfo) == 0 {
+		// 数据库里没有数据，则直接使用bqueues的数据做数据源
+		return info.SyncQueue()
 	}
 
-	lsfLog.Infof("initQueue: Update queueInfo from bqueues")
-
-	queueInfoFromBqueues, err := GetQueuesInfo()
-	if err != nil {
-		return err
-	}
-
-	err = info.UpdateQueueInfo(queueInfoFromBqueues)
-	if err != nil {
-		return err
-	}
-
-	info.QueueInfo = queueInfoFromBqueues
+	info.QueueInfo = queueInfo
 	return nil
 }
 
@@ -278,7 +406,7 @@ func (info *LsfInfo) Init() error {
 	if len(hostsFromDb) > 0 {
 		lsfLog.Infof("Init: Update hosts from db")
 		info.UpdateWorkerNodes(hostsFromDb)
-		return nil
+		return info.InitQueue()
 	}
 
 	hostsFromBhosts, err := GetHosts()
@@ -303,7 +431,7 @@ func (info *LsfInfo) Init() error {
 }
 
 func (info *LsfInfo) DelHostname(hostname string) error {
-	// del host
+
 	err := info.DelHost(hostname)
 	if err != nil {
 		return err

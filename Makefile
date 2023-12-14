@@ -1,4 +1,4 @@
-export NODECLI_VERSION=0.3.2
+export NODECLI_VERSION=0.4.0
 export TESTRUN_VERSION=0.1.0
 
 build-nodecli:

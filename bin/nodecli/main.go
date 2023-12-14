@@ -51,7 +51,6 @@ func NodeAddCommand(action func(ctx *cli.Context) error) *cli.Command {
 }
 
 func NodeDelCommand(action func(ctx *cli.Context) error) *cli.Command {
-
 	return &cli.Command{
 		Name:   "del",
 		Usage:  "del node from openlava, and regenerate config",
@@ -72,6 +71,26 @@ func ShowQueueInfoCommand(action func(ctx *cli.Context) error) *cli.Command {
 	}
 }
 
+func GenConfigCommand(action func(ctx *cli.Context) error) *cli.Command {
+	return &cli.Command{
+		Name:   "gen",
+		Usage:  "generate config based on database",
+		Action: action,
+		Flags: []cli.Flag{
+			ConfigDirFlag,
+		},
+	}
+}
+
+func SyncQueueInfoCommand(action func(ctx *cli.Context) error) *cli.Command {
+	return &cli.Command{
+		Name:   "sync_queue",
+		Usage:  "sync queue info based on bqueues info",
+		Action: action,
+		Flags:  []cli.Flag{},
+	}
+}
+
 func ShowQueueInfo(ctx *cli.Context) error {
 	lsfInfo, err := lsf.MakeLsfInfo()
 
@@ -83,6 +102,32 @@ func ShowQueueInfo(ctx *cli.Context) error {
 		utilLog.Infof("QueueInfo: %v users: %v, hosts: %v", info.QueueName, info.Users, info.Hosts)
 	}
 
+	return nil
+}
+
+func GenConfig(ctx *cli.Context) error {
+	lsfInfo, err := lsf.MakeLsfInfo()
+
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenLsfClusterConfig(fmt.Sprintf("%s/lsf.cluster.openlava", configDir))
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenBhostsConfig(fmt.Sprintf("%s/lsb.hosts", configDir))
+	if err != nil {
+		return err
+	}
+
+	err = lsfInfo.GenLsfQueueConfig(fmt.Sprintf("%s/lsb.queues", configDir))
+	if err != nil {
+		return err
+	}
+
+	utilLog.Infof("GenConfig finished, config dir: %s", configDir)
 	return nil
 }
 
@@ -156,6 +201,16 @@ func AddNode(ctx *cli.Context) error {
 	return nil
 }
 
+func SyncQueueInfo(ctx *cli.Context) error {
+	lsfInfo, err := lsf.MakeLsfInfo()
+
+	if err != nil {
+		return err
+	}
+
+	return lsfInfo.SyncQueue()
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "nodecli"
@@ -164,6 +219,8 @@ func main() {
 		NodeAddCommand(AddNode),
 		NodeDelCommand(DelNode),
 		ShowQueueInfoCommand(ShowQueueInfo),
+		SyncQueueInfoCommand(SyncQueueInfo),
+		GenConfigCommand(GenConfig),
 	}
 
 	if err := app.Run(os.Args); err != nil {
